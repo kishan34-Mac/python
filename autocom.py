@@ -16,38 +16,23 @@ GIT_USER_NAME = "Kishan Singh"
 GIT_USER_EMAIL = "jsmith80769@gmail.com"  # Verified GitHub email for kishan34-Mac
 GITHUB_USERNAME = "kishan34-Mac"
 
-# Target repositories to maintain contribution graph
+# Target repositories to maintain daily activity
 REPO_PATHS = [
     "/Users/kishan/Desktop/Insta-Dm 2",
 ]
 
-# GitHub Contribution Levels for kishan34-Mac:
-# Analyzed from live profile (max daily contribution: 391 commits):
-# Level 0: 0 commits (Gray)
-# Level 1: 1 - 66 commits (Light Green)
-# Level 2: 80 - 110 commits (Medium Green)
-# Level 3: 150 - 220 commits (Deep Green)
-# Level 4: 250 - 300+ commits (Darkest Green 🔥)
-TARGET_DARK_COMMITS = 295  # Target commits to guarantee Level 4 (Darkest Green)
-
-LEVEL_COMMITS = {
-    1: 15,    # Light Green
-    2: 90,    # Medium Green
-    3: 180,   # Deep Green
-    4: 295,   # Darkest Green 🔥
-}
-
-DEFAULT_LEVEL = 4  # Default to Level 4 (Darkest Green)
+# Set default commits to 5 - 6 commits per run
+DEFAULT_MIN_COMMITS = 5
+DEFAULT_MAX_COMMITS = 6
 
 COMMIT_MESSAGES = [
-    "⚡ update progress and logs",
+    "✨ feat: update core logic and daily modules",
     "📝 docs: update daily progress tracking",
-    "🔧 refactor: internal code updates",
-    "✨ feat: sync recent updates",
+    "🔧 refactor: improve internal code structure",
     "🐛 fix: minor adjustments and tweaks",
-    "🚀 chore: update build and activity log",
-    "♻️ refactor: optimize core routines",
-    "📈 perf: improve performance metrics"
+    "🚀 chore: update project build and sync logs",
+    "♻️ refactor: optimize component routines",
+    "📈 perf: improve processing efficiency"
 ]
 
 INTERVAL = 300  # 5 min interval for loop mode
@@ -134,13 +119,10 @@ def check_github_graph_status(username=GITHUB_USERNAME):
             log(f"   • Tooltip: {tooltip}")
             log(f"   • Level:   {level_names.get(level, f'Level {level}')}")
 
-            if level == 4:
-                log("   🎉 SUCCESS! Level 4 Dark Green is already LIVE on your profile!")
-            elif level > 0:
-                log(f"   🟢 Green registered on GitHub! ({tooltip})")
+            if level > 0:
+                log(f"   🟢 Activity recorded on GitHub! ({tooltip})")
             else:
-                log("   ⏳ Note: GitHub's background worker is processing your newly pushed commits.")
-                log("      Contributions usually take 5–15 minutes to reflect on the profile graph.")
+                log("   ⏳ Note: GitHub's background worker processes newly pushed commits within 5–10 mins.")
                 log("      Tip: Hard refresh your profile with Cmd + Shift + R (Mac) or Ctrl + F5 (Win).")
             return level, tooltip
         else:
@@ -149,10 +131,9 @@ def check_github_graph_status(username=GITHUB_USERNAME):
         log(f"⚠️ Could not check live GitHub status ({e})")
     return None, None
 
-def process_repo_dark(repo, target_total=TARGET_DARK_COMMITS, custom_commits=None):
+def process_repo(repo, num_commits=None):
     """
-    Ensures today's commits reach the dark green threshold (Level 4).
-    Fast, reliable, and pushes cleanly to origin main.
+    Generates exactly 5-6 clean, realistic commits and pushes cleanly to origin/main.
     """
     if not os.path.isdir(repo):
         log(f"❌ Invalid repo path: {repo}")
@@ -164,10 +145,10 @@ def process_repo_dark(repo, target_total=TARGET_DARK_COMMITS, custom_commits=Non
     # 1. Recover from any unfinished rebase/merge
     git_dir = Path(repo) / ".git"
     if (git_dir / "rebase-merge").exists() or (git_dir / "rebase-apply").exists():
-        log("⚠️ Found unfinished rebase in progress. Aborting it...")
+        log("⚠️ Found unfinished rebase. Aborting it...")
         run(["git", "rebase", "--abort"], repo)
     if (git_dir / "MERGE_HEAD").exists():
-        log("⚠️ Found unfinished merge in progress. Aborting it...")
+        log("⚠️ Found unfinished merge. Aborting it...")
         run(["git", "merge", "--abort"], repo)
 
     # 2. Switch to main branch
@@ -181,40 +162,31 @@ def process_repo_dark(repo, target_total=TARGET_DARK_COMMITS, custom_commits=Non
     run(["git", "fetch", "origin", "main"], repo)
     pull_res = run(["git", "pull", "--rebase", "origin", "main"], repo)
     if pull_res.returncode != 0:
-        log("⚠️ Rebase conflict encountered. Resetting local main to origin/main...")
+        log("⚠️ Pull conflict encountered. Resetting to origin/main...")
         run(["git", "rebase", "--abort"], repo)
         run(["git", "reset", "--hard", "origin/main"], repo)
 
-    # 4. Check commits already done today
-    already_done = get_today_commits_count(repo)
-    today_str = dt.datetime.now().strftime("%Y-%m-%d")
-    log(f"📅 Today ({today_str}) existing commits: {already_done}")
-
-    if custom_commits is not None:
-        needed = custom_commits
-        log(f"🎯 Custom commit mode: Generating {needed} commits...")
+    # 4. Determine commit count (5 to 6 commits by default)
+    if num_commits is not None:
+        commits_to_create = num_commits
     else:
-        needed = max(0, target_total - already_done)
-        log(f"🎯 Dark Green Target: {target_total} commits needed | Remaining to generate: {needed}")
+        commits_to_create = random.randint(DEFAULT_MIN_COMMITS, DEFAULT_MAX_COMMITS)
 
-    if needed <= 0:
-        log(f"🎉 Already reached target of {target_total} commits for today! Bar graph is dark green.")
-        return 0
+    today_count = get_today_commits_count(repo)
+    today_str = dt.datetime.now().strftime("%Y-%m-%d")
+    log(f"📅 Today ({today_str}) existing commits: {today_count}")
+    log(f"⚡ Generating exactly {commits_to_create} quality commits...")
 
-    log(f"⚡ Fast-generating {needed} commits...")
     start_num = get_last_commit_num(repo)
     start_time = time.time()
-
     now = dt.datetime.now()
-    batch_size = 50  # Push every 50 commits to avoid giant single push while keeping it fast
     successful_commits = 0
 
-    for i in range(1, needed + 1):
+    for i in range(1, commits_to_create + 1):
         commit_id = start_num + i
 
-        # Calculate a realistic distributed timestamp within today
-        # Spread commits slightly across the current hour
-        seconds_offset = (needed - i) * 2
+        # Natural distributed timestamps spaced by 15-30 seconds
+        seconds_offset = (commits_to_create - i) * 20
         commit_dt = now - dt.timedelta(seconds=seconds_offset)
         timestamp_str = commit_dt.strftime("%Y-%m-%d %H:%M:%S")
         iso_date = commit_dt.strftime("%Y-%m-%dT%H:%M:%S%z")
@@ -224,7 +196,6 @@ def process_repo_dark(repo, target_total=TARGET_DARK_COMMITS, custom_commits=Non
 
         msg = f"{random.choice(COMMIT_MESSAGES)} (#{commit_id})"
 
-        # Commit with today's author and committer dates
         env_dates = {
             "GIT_AUTHOR_DATE": iso_date,
             "GIT_COMMITTER_DATE": iso_date
@@ -233,24 +204,22 @@ def process_repo_dark(repo, target_total=TARGET_DARK_COMMITS, custom_commits=Non
         if commit_res.returncode == 0:
             successful_commits += 1
 
-        # Push in intermediate batches of 50 or at the final commit
-        if i % batch_size == 0 or i == needed:
-            log(f"📤 Pushing batch ({i}/{needed} commits)...")
-            push_res = run(["git", "push", "origin", "main"], repo)
-            if push_res.returncode != 0:
-                log(f"❌ Push batch failed: {push_res.stderr.strip()}")
-                return successful_commits
-
+    # Single push to GitHub
+    log(f"📤 Pushing {successful_commits} commits to origin/main...")
+    push_res = run(["git", "push", "origin", "main"], repo)
     elapsed = round(time.time() - start_time, 2)
-    log(f"✅ SUCCESS! Generated & pushed {successful_commits} commits to origin/main in {elapsed}s! 🚀")
-    return successful_commits
+
+    if push_res.returncode == 0:
+        log(f"✅ SUCCESS! Generated & pushed {successful_commits} commits in {elapsed}s! 🚀")
+        return successful_commits
+    else:
+        log(f"❌ Push failed: {push_res.stderr.strip()}")
+        return 0
 
 def main():
-    parser = argparse.ArgumentParser(description="GitHub Dark Green Contribution Automation")
-    parser.add_argument("--level", type=int, choices=[1, 2, 3, 4], default=DEFAULT_LEVEL,
-                        help="Target commit level (default Level 4: 295 commits for Dark Green)")
+    parser = argparse.ArgumentParser(description="GitHub Activity Automation (5-6 Quality Commits)")
     parser.add_argument("--commits", type=int, default=None,
-                        help="Exact number of commits to generate (overrides default)")
+                        help="Exact number of commits to generate (default: 5-6)")
     parser.add_argument("--check", action="store_true",
                         help="Check live GitHub contribution graph status without generating commits")
     parser.add_argument("--loop", action="store_true",
@@ -260,7 +229,7 @@ def main():
 
     args = parser.parse_args()
 
-    log("🚀 GitHub Contribution Graph Automation Tool")
+    log("🚀 GitHub Contribution Graph Tool (Safe 5-6 Commits)")
     log(f"Author Email:    {GIT_USER_EMAIL}")
     log(f"Author Name:     {GIT_USER_NAME}")
     log(f"GitHub Profile:  https://github.com/{GITHUB_USERNAME}")
@@ -269,22 +238,15 @@ def main():
         check_github_graph_status(GITHUB_USERNAME)
         return
 
-    # Determine target count based on level or custom commits
-    target_count = LEVEL_COMMITS.get(args.level, TARGET_DARK_COMMITS)
-
     while True:
         for repo in REPO_PATHS:
-            process_repo_dark(
-                repo,
-                target_total=target_count,
-                custom_commits=args.commits
-            )
+            process_repo(repo, num_commits=args.commits)
 
         # Check live graph status
         check_github_graph_status(GITHUB_USERNAME)
 
         if not args.loop:
-            log("🎉 Finished. You can view your graph at https://github.com/" + GITHUB_USERNAME)
+            log("🎉 Finished. Check your profile at https://github.com/" + GITHUB_USERNAME)
             break
 
         log(f"😴 Sleeping for {args.interval} seconds...\n")
